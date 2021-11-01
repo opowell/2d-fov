@@ -14,6 +14,7 @@
          body{
              text-align: center;
              background: #eee;
+             margin: 0;
          }
         </style>
 
@@ -21,17 +22,8 @@
     </head>
 
     <body onload="start()">
-        <header>
-            <h1 class="title">Field of View and Line of Sight in 2D</h1>
-        </header>
         <div>
-            <p>
-                Move mouse to change viewing direction.
-                Click to reposition viewer.<br />
-            </p>
-            <p>
-                <canvas id="canvas2d" width="640" height="480" />
-            </p>
+            <canvas id="canvas2d" width="940" height="680" />
         </div>
         <div>
             <p>
@@ -40,48 +32,25 @@
                        name="chkDebug"
                        onchange="toggleDebugView()">
             </p>
-            <p>
-                See the <a href="design.html">design document</a> for details.
-                Visit the <a href="http://github.com/legends2k/2d-fov">project
-                repository</a>.
-            </p>
         </div>
-        <footer>
-            <address> Sundaram Ramaswamy,
-                <script type="text/javascript"> <!--
-                                               h='&#x79;&#x61;&#104;&#x6f;\
-&#x6f;&#46;&#x63;&#x6f;&#x6d;'; a='&#64;';n='&#108;&#x65;&#x67;&#x65;&#110;\
-&#100;&#x73;&#50;&#x6b;';e=n+a+h;
-                 document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'" clas'+
-                                's="em' + 'ail">'+e+'<\/'+'a'+'>'); // -->
-                </script>
-                <noscript>
-                    &#108;&#x65;&#x67;&#x65;&#110;&#100;&#x73;&#50;&#x6b;&#32;
-                    &#x61;&#116;&#32;&#x79;&#x61;&#104;&#x6f;&#x6f;&#32;
-                    &#100;&#x6f;&#116;&#32;&#x63;&#x6f;&#x6d;
-                </noscript>
-                </address>
-        </footer>
-        <p><small>Best viewed in Firefox, Chrome,
-            Opera, Edge or Safari.</small></p>
     </body>
 </html>
 
 <script>
  "use strict";
 
- var canvas = document.getElementById("canvas2d");
- var ctx, scene;
- var FoV = 1.25663706143;  // 72° field of vision in radians
- var halfFoV = FoV / 2;
- var halfFoVCos = Math.cos(halfFoV); // 0.809016994375
- var halfFoVSin = Math.sin(halfFoV); // 0.587785252292
- var visionRadius = 240;
- var personRadius = 5;
- var wallColour = "105, 105, 105";
- var observerColour = "255, 128, 128";
- var targetColour = "128, 128, 255";
- var targetSeenColour = "255, 0, 255";
+ const canvas = document.getElementById("canvas2d");
+ let ctx, scene;
+ const FoV = 1.25663706143;  // 72° field of vision in radians
+ const halfFoV = FoV / 2;
+ const halfFoVCos = Math.cos(halfFoV); // 0.809016994375
+ const halfFoVSin = Math.sin(halfFoV); // 0.587785252292
+ const visionRadius = 480;
+ const personRadius = 5;
+ const wallColour = "105, 105, 105";
+ const observerColour = "255, 128, 128";
+ const targetColour = "128, 128, 255";
+ const targetSeenColour = "255, 0, 255";
  // 0.01 or even 0.05 doesn't work in this case: an angle point was found by an
  // edge – sector arc intersection; later the ray formed due to this angle point
  // hits the same (blocking) edge and the edge – ray intersection point obtained
@@ -91,10 +60,10 @@
  // sector.centre = (129, 316), rotate sector 360° and test for correctness.
  // Test case: keep only the triangle and the world boundary polygons, set
  // sector.centre = (120, 249), rotate sector 360° and test for correctness.
- var epsilon = 0.075;
- var halfAuxRayTilt = 8.72664625995e-3;               // half degree in radians
- var halfAuxRayTiltCos = Math.cos(halfAuxRayTilt);    // 0.999961923064
- var halfAuxRayTiltSin = Math.sin(halfAuxRayTilt);    // 8.72653549837e-3
+ const epsilon = 0.075;
+ const halfAuxRayTilt = 8.72664625995e-3;               // half degree in radians
+ const halfAuxRayTiltCos = Math.cos(halfAuxRayTilt);    // 0.999961923064
+ const halfAuxRayTiltSin = Math.sin(halfAuxRayTilt);    // 8.72653549837e-3
 
  // enable this for debug view
  var debug = false;
@@ -816,10 +785,10 @@
      return {hitPoints: hitPoints, ctrlPoints: ctrlPoints};
  }
 
- function isSubjectVisible(blockingEdges, sector) {
-     if (isPointInSector(scene.target.loc, sector) == PointInSector.Within) {
+ function isSubjectVisible(blockingEdges, sector, target) {
+     if (isPointInSector(target.loc, sector) == PointInSector.Within) {
          var ray = { vec: vec2.create(), ends: [sector.centre] };
-         vec2.sub(ray.vec, scene.target.loc, sector.centre);
+         vec2.sub(ray.vec, target.loc, sector.centre);
          return !blockingEdges.some(function (edge) {
              var res = lineSegLineSegXsect(ray,
                                            edge,
@@ -832,6 +801,18 @@
  }
 
  function update() {
+    const dx = scene.observer.destination[0] - scene.observer.loc[0]
+     const dy = scene.observer.destination[1] - scene.observer.loc[1]
+     if (dx !== 0) {
+         const dydx = dy/dx
+         const speed = 2
+         let locDx = speed / Math.sqrt( 1 + Math.pow(dydx, 2))
+         if (dx < 0) locDx = -locDx
+         const locDy = locDx * dydx
+         scene.observer.loc[0] += locDx
+         scene.observer.loc[1] += locDy
+     }
+
      var sector = scene.observer.sector;
      updateSector(sector);
 
@@ -860,8 +841,11 @@
      fov.rays = rays;
      fov.hitPoints = result.hitPoints;
      fov.ctrlPoints = result.ctrlPoints;
-     scene.target.colour = isSubjectVisible(blockingEdges, sector) ?
-                           targetSeenColour : targetColour;
+     for (const i in scene.targets) {
+         const target = scene.targets[i]
+         target.colour = isSubjectVisible(blockingEdges, sector, target) ?
+           targetSeenColour : targetColour;
+     }
  }
 
  function render() {
@@ -874,7 +858,7 @@
          drawPolygon(scene.polygons[i]);
 
      // draw personnel
-     drawPerson(scene.target);
+     scene.targets.forEach(target => drawPerson(target))
      drawPerson(scene.observer);
 
      var fov = scene.observer.fov;
@@ -981,6 +965,10 @@
  }
 
  function start() {
+     const width = window.innerWidth
+     const height = window.innerHeight
+     document.getElementById('canvas2d').setAttribute('width', width)
+     document.getElementById('canvas2d').setAttribute('height', height)
      init2DCanvas(canvas);
 
      // global scene dictionary
@@ -1002,6 +990,22 @@
                colour: wallColour,
                stroke: 1,
                fill: false },
+             { coords: [ 670,50,790,70,770,140,700,130 ],
+               colour: wallColour,
+               stroke: 1,
+               fill: true },
+             { coords: [ 870,250,990,270,970,340,900,330 ],
+                 colour: wallColour,
+                 stroke: 1,
+                 fill: true },
+             { coords: [ 670,450,790,470,770,540,700,530 ],
+               colour: wallColour,
+               stroke: 1,
+               fill: true },
+             { coords: [ 870,650,990,670,970,740,900,730 ],
+                 colour: wallColour,
+                 stroke: 1,
+                 fill: true },
              { coords: [188.57143,381.89539,
                         167.824635,304.467285,
                         328.25502,261.480095,
@@ -1016,16 +1020,31 @@
                colour: wallColour,
                stroke: 1,
                fill: true },
-             { coords: [ 0,0,640,0,640,480,0,480 ],
+             { coords: [ 0,0,width,0,width,height,0,height ],
                colour: "128, 128, 128",
                stroke: 1,
                fill: false} ],
          observer: { loc: vec2.fromValues(374, 203),
                      dir: vec2.fromValues(-0.707106781186, 0.707106781186),
+             destination: vec2.fromValues(374, 203),
                      colour: observerColour },
-         target: { loc: vec2.fromValues(293, 100),
-                   dir: vec2.fromValues(-1, 0),
-                   colour: targetColour }
+         targets: [
+           { loc: vec2.fromValues(293, 100),
+               dir: vec2.fromValues(-1, 0),
+               colour: targetColour },
+             { loc: vec2.fromValues(893, 100),
+                 dir: vec2.fromValues(-1, 0),
+                 colour: targetColour },
+             { loc: vec2.fromValues(893, 150),
+                 dir: vec2.fromValues(-1, 0),
+                 colour: targetColour },
+             { loc: vec2.fromValues(893, 200),
+                 dir: vec2.fromValues(-1, 0),
+                 colour: targetColour },
+             { loc: vec2.fromValues(593, 800),
+                 dir: vec2.fromValues(1, 1),
+                 colour: targetColour }
+           ]
      };
      constructEdges(scene.polygons);
 
@@ -1060,7 +1079,9 @@
  }
 
  function handleClick (e) {
-     scene.observer.loc = getCursorPosition(e, canvas);
+    const position = getCursorPosition(e, canvas)
+     console.log('click at', e, position)
+    scene.observer.destination = position
      window.requestAnimationFrame(mainLoop);
  }
 
